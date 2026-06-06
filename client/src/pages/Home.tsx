@@ -48,9 +48,99 @@ export default function Home() {
             transition={{ duration: 0.8 }}
             className="relative"
           >
-            <div className="bg-surface-container-lowest rounded-2xl shadow-xl border border-surface-border overflow-hidden">
-              <div className="aspect-video bg-gradient-to-br from-secondary-fixed/20 to-primary-fixed/20 flex items-center justify-center">
-                <Shield className="w-24 h-24 text-secondary/30" />
+            <div className="bg-[#0f172a] rounded-2xl shadow-xl border border-surface-border overflow-hidden transition-all duration-500 hover:shadow-2xl group">
+              <div className="aspect-video relative overflow-hidden">
+                {/* Base gradient */}
+                <div className="absolute inset-0 bg-gradient-to-br from-[#1e293b] via-[#0f172a] to-[#020617]" />
+
+                {/* Grid pattern */}
+                <div
+                  className="absolute inset-0 opacity-20"
+                  style={{
+                    backgroundImage: `radial-gradient(circle, rgba(148,163,184,0.3) 1px, transparent 1px)`,
+                    backgroundSize: '20px 20px',
+                  }}
+                />
+
+                {/* Coastline shapes */}
+                <svg className="absolute inset-0 w-full h-full opacity-30" viewBox="0 0 800 500" preserveAspectRatio="none">
+                  <defs>
+                    <linearGradient id="coast" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#10b981" stopOpacity="0.4" />
+                      <stop offset="100%" stopColor="#10b981" stopOpacity="0" />
+                    </linearGradient>
+                  </defs>
+                  <path d="M 0,400 Q 100,350 150,380 T 300,360 T 450,390 T 600,350 T 800,380 L 800,500 L 0,500 Z" fill="url(#coast)" />
+                  <path d="M 0,420 Q 120,370 180,400 T 320,380 T 470,410 T 620,370 T 800,400 L 800,500 L 0,500 Z" fill="url(#coast)" opacity="0.6" />
+                </svg>
+
+                {/* Shipping route arcs */}
+                <svg className="absolute inset-0 w-full h-full" viewBox="0 0 800 500" preserveAspectRatio="none">
+                  <path d="M 80,380 Q 200,200 350,280" fill="none" stroke="#10b981" strokeWidth="2" strokeDasharray="4,4" opacity="0.6" />
+                  <circle cx="80" cy="380" r="3" fill="#10b981" opacity="0.8" />
+                  <circle cx="350" cy="280" r="3" fill="#10b981" opacity="0.8" />
+                  <path d="M 200,400 Q 350,220 500,300" fill="none" stroke="#3b82f6" strokeWidth="2" strokeDasharray="4,4" opacity="0.6" />
+                  <circle cx="200" cy="400" r="3" fill="#3b82f6" opacity="0.8" />
+                  <circle cx="500" cy="300" r="3" fill="#3b82f6" opacity="0.8" />
+                  <path d="M 350,380 Q 500,250 650,320" fill="none" stroke="#f59e0b" strokeWidth="2" strokeDasharray="4,4" opacity="0.5" />
+                  <circle cx="350" cy="380" r="3" fill="#f59e0b" opacity="0.8" />
+                  <circle cx="650" cy="320" r="3" fill="#f59e0b" opacity="0.8" />
+                  <path d="M 500,420 Q 600,280 750,350" fill="none" stroke="#10b981" strokeWidth="1.5" strokeDasharray="4,4" opacity="0.4" />
+                  <circle cx="500" cy="420" r="3" fill="#10b981" opacity="0.8" />
+                  <circle cx="750" cy="350" r="3" fill="#10b981" opacity="0.8" />
+                </svg>
+
+                {/* Telemetry panels */}
+                <div className="absolute top-4 right-4 opacity-70 group-hover:opacity-100 transition-opacity">
+                  <div className="bg-black/60 backdrop-blur-sm rounded-lg px-3 py-2 border border-white/10">
+                    <div className="text-[10px] text-emerald-400 font-semibold uppercase tracking-wider">Active Transit</div>
+                    <div className="text-white text-sm font-bold font-mono-data">284</div>
+                  </div>
+                </div>
+                <div className="absolute top-4 left-4 opacity-70 group-hover:opacity-100 transition-opacity">
+                  <div className="bg-black/60 backdrop-blur-sm rounded-lg px-3 py-2 border border-white/10">
+                    <div className="text-[10px] text-blue-400 font-semibold uppercase tracking-wider">Sales Volume</div>
+                    <div className="text-white text-sm font-bold font-mono-data">$20.7M</div>
+                  </div>
+                </div>
+
+                {/* Segment counts */}
+                <div className="absolute bottom-16 left-4 flex gap-2 opacity-70 group-hover:opacity-100 transition-opacity">
+                  <div className="bg-black/50 backdrop-blur-sm rounded-md px-2 py-1 border border-white/5">
+                    <div className="text-[9px] text-emerald-400 font-semibold">Bikes</div>
+                    <div className="text-white text-xs font-bold font-mono-data">60</div>
+                  </div>
+                  <div className="bg-black/50 backdrop-blur-sm rounded-md px-2 py-1 border border-white/5">
+                    <div className="text-[9px] text-blue-400 font-semibold">Accessories</div>
+                    <div className="text-white text-xs font-bold font-mono-data">20</div>
+                  </div>
+                  <div className="bg-black/50 backdrop-blur-sm rounded-md px-2 py-1 border border-white/5">
+                    <div className="text-[9px] text-amber-400 font-semibold">Clothing</div>
+                    <div className="text-white text-xs font-bold font-mono-data">20</div>
+                  </div>
+                </div>
+
+                {/* Pulse dots */}
+                <div className="absolute inset-0">
+                  <span className="absolute top-[45%] left-[15%] w-2 h-2 bg-emerald-400 rounded-full animate-ping opacity-30" />
+                  <span className="absolute top-[60%] left-[42%] w-2 h-2 bg-blue-400 rounded-full animate-ping opacity-30" style={{ animationDelay: '0.5s' }} />
+                  <span className="absolute top-[55%] left-[70%] w-2 h-2 bg-amber-400 rounded-full animate-ping opacity-30" style={{ animationDelay: '1s' }} />
+                </div>
+              </div>
+            </div>
+
+            {/* Floating glassmorphic badge */}
+            <div className="absolute -bottom-6 -left-6 glass-panel px-5 py-3 rounded-xl shadow-lg border border-surface-border hidden sm:flex items-center gap-4 transition-transform hover:-translate-y-1 duration-200">
+              <div className="p-2.5 bg-secondary-container rounded-lg text-secondary border border-secondary-fixed">
+                <Database className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="font-stat-kpi text-xl lg:text-2xl font-bold tracking-tight text-primary">
+                  4.2PB
+                </div>
+                <div className="font-label-sm text-[10px] font-semibold text-on-surface-variant uppercase tracking-wider">
+                  Active Spatial Data
+                </div>
               </div>
             </div>
           </motion.div>

@@ -1,14 +1,10 @@
 import { useState, useCallback } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { useApiData } from '@/hooks/useApiData'
+import { useGeoJSON } from '@/hooks/useGeoJSON'
 import { useDebounce } from '@/hooks/useDebounce'
-import type { GeoJSONCollection } from '@/types'
 import MapSidebar from './MapSidebar'
 import MapContainer from './MapContainer'
 import MapLegend from './MapLegend'
-import { ErrorState } from '@/components/ui/ErrorState'
-import { EmptyState } from '@/components/ui/EmptyState'
-import { KPICardSkeleton } from '@/components/ui/Skeleton'
 
 const CATEGORIES = ['Accessories', 'Bikes', 'Clothing']
 
@@ -26,7 +22,7 @@ export default function MapPage() {
   if (segment) params.segment = segment
   if (search) params.search = search
 
-  const { data: geojson, loading, error, refetch } = useApiData<GeoJSONCollection>(endpoint, params)
+  const { data: geojson, loading, error } = useGeoJSON(endpoint, params)
 
   const setParam = useCallback(
     (key: string, val: string) => {
@@ -43,6 +39,10 @@ export default function MapPage() {
     [setSearchParams],
   )
 
+  const handleLegendReady = useCallback((items: { label: string; color: string }[]) => {
+    setLegendItems(items)
+  }, [])
+
   return (
     <main className="relative w-full h-[calc(100vh-64px)] flex overflow-hidden bg-surface-container">
       <MapSidebar
@@ -55,25 +55,12 @@ export default function MapPage() {
         onSearchChange={(v) => setParam('search', v)}
       />
 
-      {error ? (
-        <div className="flex-1 flex items-center justify-center">
-          <ErrorState message={error} onRetry={refetch} />
-        </div>
-      ) : !geojson && !loading ? (
-        <div className="flex-1 flex items-center justify-center">
-          <EmptyState message="No map data available. Import data first." />
-        </div>
-      ) : loading && !geojson ? (
-        <div className="flex-1 flex items-center justify-center">
-          <KPICardSkeleton />
-        </div>
-      ) : (
-        <MapContainer
-          geojson={geojson}
-          loading={loading}
-          onLegendReady={(items) => setLegendItems(items)}
-        />
-      )}
+      <MapContainer
+        geojson={geojson}
+        loading={loading}
+        error={error}
+        onLegendReady={handleLegendReady}
+      />
 
       <MapLegend legend={legendItems} />
     </main>

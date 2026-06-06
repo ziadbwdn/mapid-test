@@ -1,9 +1,9 @@
-import { useState, useCallback, useEffect } from 'react'
+import { useCallback } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Search, ArrowUpDown } from 'lucide-react'
 import { useApiData } from '@/hooks/useApiData'
 import { useDebounce } from '@/hooks/useDebounce'
-import type { Product, PaginationMeta } from '@/types'
+import type { Product } from '@/types'
 import { Pagination } from '@/components/ui/Pagination'
 import { TableSkeleton } from '@/components/ui/Skeleton'
 import { ErrorState } from '@/components/ui/ErrorState'
@@ -19,7 +19,6 @@ export default function ProductTable() {
   const sortOrder = (searchParams.get('sort_order') || 'asc') as 'asc' | 'desc'
   const searchRaw = searchParams.get('search') || ''
   const search = useDebounce(searchRaw, 300)
-  const [meta, setMeta] = useState<PaginationMeta | null>(null)
 
   const setParam = useCallback(
     (key: string, val: string) => {
@@ -44,13 +43,7 @@ export default function ProductTable() {
   }
   if (search) params.search = search
 
-  const { data: products, loading, error, refetch } = useApiData<Product[]>('/products', params)
-
-  useEffect(() => {
-    if (products) {
-      setMeta(null)
-    }
-  }, [products])
+  const { data: products, meta, loading, error, refetch } = useApiData<Product[]>('/products', params)
 
   const handleSort = (field: SortField) => {
     const nextOrder = sortBy === field && sortOrder === 'asc' ? 'desc' : 'asc'
@@ -72,8 +65,8 @@ export default function ProductTable() {
   if (error) return <ErrorState message={error} onRetry={refetch} />
   if (!products) return <EmptyState message="No product data" />
 
-  const total = products.length > 0 ? meta?.total ?? products.length : 0
-  const totalPages = meta?.total_pages ?? 1
+  const total = meta?.total ?? products.length
+  const totalPages = meta?.total_pages ?? Math.max(1, Math.ceil(total / 10))
 
   return (
     <div className="bg-surface-container-lowest rounded-2xl shadow-sm border border-surface-border overflow-hidden">

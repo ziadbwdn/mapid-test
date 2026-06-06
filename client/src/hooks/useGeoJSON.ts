@@ -1,21 +1,19 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
+import type { GeoJSONCollection } from '@/types'
 import { fetchApi } from '@/services/api'
-import type { PaginationMeta } from '@/types'
 
-export interface UseApiDataResult<T> {
-  data: T | null
-  meta: PaginationMeta | null
+export interface UseGeoJSONResult {
+  data: GeoJSONCollection | null
   loading: boolean
   error: string | null
   refetch: () => void
 }
 
-export function useApiData<T>(
-  endpoint: string | null,
+export function useGeoJSON(
+  endpoint: string,
   params?: Record<string, string | number | undefined>,
-): UseApiDataResult<T> {
-  const [data, setData] = useState<T | null>(null)
-  const [meta, setMeta] = useState<PaginationMeta | null>(null)
+): UseGeoJSONResult {
+  const [data, setData] = useState<GeoJSONCollection | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [fetchId, setFetchId] = useState(0)
@@ -26,14 +24,6 @@ export function useApiData<T>(
   }, [])
 
   useEffect(() => {
-    if (!endpoint) {
-      setData(null)
-      setMeta(null)
-      setLoading(false)
-      setError(null)
-      return
-    }
-
     abortRef.current?.abort()
     const controller = new AbortController()
     abortRef.current = controller
@@ -41,11 +31,26 @@ export function useApiData<T>(
     setLoading(true)
     setError(null)
 
-    fetchApi<T>(endpoint, params, controller.signal)
+    const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api'
+    const searchParams = new URLSearchParams()
+    if (params) {
+      for (const [key, value] of Object.entries(params)) {
+        if (value !== undefined && value !== '' && value !== null) {
+          searchParams.set(key, String(value))
+        }
+      }
+    }
+    const qs = searchParams.toString()
+    const url = `${BASE_URL}${endpoint}${qs ? `?${qs}` : ''}`
+
+    fetch(url, { signal: controller.signal })
       .then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`)
+        return res.json()
+      })
+      .then((json) => {
         if (!controller.signal.aborted) {
-          setData(res.data)
-          setMeta(res.meta ?? null)
+          setData(json)
           setLoading(false)
         }
       })
@@ -53,7 +58,6 @@ export function useApiData<T>(
         if (!controller.signal.aborted) {
           const message = err instanceof Error ? err.message : 'Unknown error'
           setError(message)
-          setMeta(null)
           setLoading(false)
         }
       })
@@ -63,5 +67,5 @@ export function useApiData<T>(
     }
   }, [endpoint, JSON.stringify(params), fetchId])
 
-  return { data, meta, loading, error, refetch }
+  return { data, loading, error, refetch }
 }

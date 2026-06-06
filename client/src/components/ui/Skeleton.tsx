@@ -1,9 +1,12 @@
+import type { CSSProperties } from 'react'
+
 interface SkeletonProps {
   className?: string
+  style?: CSSProperties
 }
 
-export function Skeleton({ className = '' }: SkeletonProps) {
-  return <div className={`animate-pulse bg-gray-200 rounded ${className}`} />
+export function Skeleton({ className = '', style }: SkeletonProps) {
+  return <div className={`animate-pulse bg-gray-200 rounded ${className}`} style={style} />
 }
 
 export function KPICardSkeleton() {
@@ -18,8 +21,8 @@ export function KPICardSkeleton() {
 export function ChartSkeleton({ height = 300 }: { height?: number }) {
   return (
     <div className="p-6 bg-surface-container-lowest rounded-2xl border border-surface-border">
-      <Skeleton className={`h-4 w-40 mb-4`} />
-      <Skeleton className={`h-[${height - 80}px] w-full`} />
+      <Skeleton className="h-4 w-40 mb-4" />
+      <Skeleton className="w-full" style={{ height: height - 80 }} />
     </div>
   )
 }
