@@ -1,0 +1,26 @@
+# Ignore OS specific files
+.DS_Store
+Thumbs.db
+
+# Ignore dependencies
+/node_modules/
+/vendor/
+
+# Ignore build outputs
+/dist/
+/build/
+
+# Ignore environment files
+*.env
+*.venv/
+
+# Ignore IDE files
+.idea/
+.vscode/
+
+# material data (untracked knowledge)
+.docs/*
+
+# notebook artifacts
+notebook/*
+docs/*
