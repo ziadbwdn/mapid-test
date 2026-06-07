@@ -16,11 +16,11 @@ export default function SegmentChart() {
     <div className="bg-surface-container-lowest p-6 rounded-2xl shadow-sm border border-surface-border">
       <h3 className="font-headline-lg text-lg font-bold text-primary mb-4">Segment Distribution</h3>
       <ResponsiveContainer width="100%" height={300}>
-        <BarChart data={data}>
-          <XAxis dataKey="dimension_value" tick={{ fontSize: 12 }} />
-          <YAxis tick={{ fontSize: 12 }} />
+        <BarChart data={data} barCategoryGap="20%" barGap={4}>
+          <XAxis dataKey="dimension_value" tick={{ fontSize: 12 }} axisLine={{ stroke: '#e2e8f0' }} tickLine={false} />
+          <YAxis tick={{ fontSize: 12 }} domain={[0, 'auto']} axisLine={{ stroke: '#e2e8f0' }} tickLine={false} />
           <Tooltip />
-          <Bar dataKey="product_count" radius={[4, 4, 0, 0]}>
+          <Bar dataKey="product_count" radius={[4, 4, 0, 0]} maxBarSize={60}>
             {data.map((entry, i) => (
               <Cell key={i} fill={entry.color_code} />
             ))}

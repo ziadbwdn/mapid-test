@@ -34,16 +34,27 @@ export interface GeoJSONFeature {
     type: 'Point'
     coordinates: [number, number]
   }
-  properties: {
+  properties: Record<string, unknown> & {
     id: string
     product_key: number
     product_name: string
     category: string
-    segment: string
-    health_status: string
-    health_score: number
-    total_revenue: number
     color: string
+    category_color?: string
+    segment?: string
+    segment_color?: string
+    health_status?: string
+    health_score?: number
+    total_revenue?: number
+    total_orders?: number
+    total_quantity?: number
+    cost?: number
+    avg_selling_price?: number
+    latitude?: number
+    longitude?: number
+    recency?: number
+    time_span?: number
+    sub_category?: string
   }
 }
 

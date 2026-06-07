@@ -1,13 +1,15 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import maplibregl from 'maplibre-gl'
+import { Plus, Minus, Layers, Compass } from 'lucide-react'
 import type { GeoJSONCollection, GeoJSONFeature } from '@/types'
 import MapPopup from './MapPopup'
 
 interface MapContainerProps {
-  geojson: GeoJSONCollection | null
+  geojson: GeoJSONCollection
   loading: boolean
   error: string | null
   onLegendReady: (legend: { label: string; color: string }[]) => void
+  onMapClick?: (lngLat: { lng: number; lat: number }) => void
 }
 
 type ThemeMode = 'standard' | 'topographical' | 'dark'
@@ -15,19 +17,27 @@ type ThemeMode = 'standard' | 'topographical' | 'dark'
 const CENTER: [number, number] = [110, -7.5]
 const ZOOM = 6
 
-const OSM_STYLE = {
-  version: 8 as const,
-  sources: {
-    osm: {
-      type: 'raster' as const,
-      tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
-      tileSize: 256,
-      attribution: '&copy; OpenStreetMap contributors',
+const getMapStyle = (theme: ThemeMode) => {
+  let tilesUrl = 'https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png'
+  if (theme === 'dark') {
+    tilesUrl = 'https://basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png'
+  } else if (theme === 'topographical') {
+    tilesUrl = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
+  }
+  return {
+    version: 8 as const,
+    sources: {
+      'raster-tiles': {
+        type: 'raster' as const,
+        tiles: [tilesUrl],
+        tileSize: 256,
+        attribution: '© OpenStreetMap contributors, CARTO',
+      },
     },
-  },
-  layers: [
-    { id: 'osm-bg', type: 'raster' as const, source: 'osm' },
-  ],
+    layers: [
+      { id: 'raster-layer', type: 'raster' as const, source: 'raster-tiles', minzoom: 0, maxzoom: 19 },
+    ],
+  }
 }
 
 const THEME_BG: Record<ThemeMode, string> = {
@@ -36,142 +46,179 @@ const THEME_BG: Record<ThemeMode, string> = {
   dark: '#131b2e',
 }
 
-export default function MapContainer({ geojson, loading, error, onLegendReady }: MapContainerProps) {
-  const mapContainer = useRef<HTMLDivElement>(null)
+function initSourcesAndLayers(map: maplibregl.Map, data: GeoJSONCollection) {
+  if (map.getSource('products')) return
+
+  map.addSource('products', {
+    type: 'geojson',
+    data,
+    cluster: true,
+    clusterMaxZoom: 14,
+    clusterRadius: 50,
+  })
+
+  map.addLayer({
+    id: 'cluster-layer',
+    type: 'circle',
+    source: 'products',
+    filter: ['has', 'point_count'],
+    paint: {
+      'circle-color': '#00668a',
+      'circle-radius': ['step', ['get', 'point_count'], 20, 100, 30, 500, 40],
+      'circle-opacity': 0.7,
+      'circle-stroke-width': 2,
+      'circle-stroke-color': '#ffffff',
+    },
+  })
+
+  map.addLayer({
+    id: 'cluster-count',
+    type: 'symbol',
+    source: 'products',
+    filter: ['has', 'point_count'],
+    layout: {
+      'text-field': ['get', 'point_count_abbreviated'],
+      'text-size': 12,
+    },
+    paint: {
+      'text-color': '#ffffff',
+      'text-halo-color': '#00668a',
+      'text-halo-width': 1,
+    },
+  })
+
+  map.addLayer({
+    id: 'unclustered-point',
+    type: 'circle',
+    source: 'products',
+    filter: ['!', ['has', 'point_count']],
+    paint: {
+      'circle-color': ['coalesce', ['get', 'category_color'], '#6366f1'],
+      'circle-radius': 8,
+      'circle-stroke-width': 2,
+      'circle-stroke-color': '#ffffff',
+    },
+  })
+}
+
+export default function MapContainer({ geojson, loading, error, onLegendReady, onMapClick }: MapContainerProps) {
+  const mapContainerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<maplibregl.Map | null>(null)
-  const pendingData = useRef<GeoJSONCollection | null>(null)
   const mapReady = useRef(false)
-  const [popup, setPopup] = useState<{ feature: GeoJSONFeature; x: number; y: number } | null>(null)
   const [theme, setTheme] = useState<ThemeMode>('standard')
   const [coords, setCoords] = useState({ lat: -7.5, lng: 110 })
+  const [selectedFeature, setSelectedFeature] = useState<{
+    feature: GeoJSONFeature
+    lngLat: { lng: number; lat: number }
+  } | null>(null)
+  const [popupPos, setPopupPos] = useState<{ x: number; y: number } | null>(null)
   const legendReadyRef = useRef(onLegendReady)
   legendReadyRef.current = onLegendReady
+  const geojsonRef = useRef(geojson)
+  geojsonRef.current = geojson
+  const selectedFeatureRef = useRef(selectedFeature)
+  selectedFeatureRef.current = selectedFeature
 
   const applyData = useCallback((data: GeoJSONCollection) => {
     const map = mapRef.current
-    if (!map || !mapReady.current) {
-      pendingData.current = data
-      return
-    }
+    if (!map || !mapReady.current) return
     const source = map.getSource('products') as maplibregl.GeoJSONSource | undefined
-    if (source) {
-      source.setData(data)
-    } else {
-      pendingData.current = data
-    }
+    if (source) source.setData(data)
   }, [])
 
+  const reInitMapContent = useCallback(() => {
+    const map = mapRef.current
+    if (!map) return
+    initSourcesAndLayers(map, geojsonRef.current)
+    mapReady.current = true
+    applyData(geojsonRef.current)
+    extractLegend(geojsonRef.current)
+  }, [applyData])
+
+  const updatePopupPosition = useCallback(() => {
+    const map = mapRef.current
+    const sel = selectedFeatureRef.current
+    if (!map || !sel) {
+      setPopupPos(null)
+      return
+    }
+    const point = map.project([sel.lngLat.lng, sel.lngLat.lat])
+    setPopupPos({ x: point.x, y: point.y })
+  }, [])
+
+  function extractLegend(data: GeoJSONCollection) {
+    const colors = new Map<string, string>()
+    data.features.forEach((f) => {
+      const cat = f.properties.category
+      const col = f.properties.color
+      if (cat && col && !colors.has(cat)) {
+        colors.set(cat, col as string)
+      }
+    })
+    const legend = Array.from(colors.entries()).map(([label, color]) => ({ label, color }))
+    legendReadyRef.current(legend)
+  }
+
+  // Init map
   useEffect(() => {
-    if (!mapContainer.current || mapRef.current) return
+    if (!mapContainerRef.current || mapRef.current) return
 
     const map = new maplibregl.Map({
-      container: mapContainer.current,
-      style: OSM_STYLE,
+      container: mapContainerRef.current,
+      style: getMapStyle(theme),
       center: CENTER,
       zoom: ZOOM,
+      attributionControl: false,
     })
 
-    map.addControl(new maplibregl.NavigationControl(), 'top-right')
-
     map.on('load', () => {
-      map.addSource('products', {
-        type: 'geojson',
-        data: { type: 'FeatureCollection', features: [] },
-        cluster: true,
-        clusterMaxZoom: 14,
-        clusterRadius: 50,
-      })
-
-      map.addLayer({
-        id: 'cluster-layer',
-        type: 'circle',
-        source: 'products',
-        filter: ['has', 'point_count'],
-        paint: {
-          'circle-color': '#00668a',
-          'circle-radius': ['step', ['get', 'point_count'], 20, 100, 30, 500, 40],
-          'circle-opacity': 0.7,
-          'circle-stroke-width': 2,
-          'circle-stroke-color': '#ffffff',
-        },
-      })
-
-      map.addLayer({
-        id: 'cluster-count',
-        type: 'symbol',
-        source: 'products',
-        filter: ['has', 'point_count'],
-        layout: {
-          'text-field': ['get', 'point_count_abbreviated'],
-          'text-size': 12,
-        },
-        paint: {
-          'text-color': '#ffffff',
-          'text-halo-color': '#00668a',
-          'text-halo-width': 1,
-        },
-      })
-
-      map.addLayer({
-        id: 'unclustered-point',
-        type: 'circle',
-        source: 'products',
-        filter: ['!', ['has', 'point_count']],
-        paint: {
-          'circle-color': ['coalesce', ['get', 'category_color'], '#6366f1'],
-          'circle-radius': 8,
-          'circle-stroke-width': 2,
-          'circle-stroke-color': '#ffffff',
-        },
-      })
-
+      initSourcesAndLayers(map, geojsonRef.current)
       mapReady.current = true
-
-      if (pendingData.current) {
-        const source = map.getSource('products') as maplibregl.GeoJSONSource
-        source.setData(pendingData.current)
-        pendingData.current = null
-      }
-
-      map.on('click', 'cluster-layer', async (e) => {
-        const features = map.queryRenderedFeatures(e.point, { layers: ['cluster-layer'] })
-        const clusterId = features[0]?.properties?.cluster_id
-        if (clusterId && e.lngLat) {
-          const source = map.getSource('products') as maplibregl.GeoJSONSource
-          const zoom = await source.getClusterExpansionZoom(clusterId)
-          map.easeTo({ center: e.lngLat, zoom })
-        }
-      })
-
-      map.on('click', 'unclustered-point', (e) => {
-        const features = map.queryRenderedFeatures(e.point, { layers: ['unclustered-point'] })
-        if (features.length > 0 && e.originalEvent) {
-          const feat = features[0] as unknown as GeoJSONFeature
-          const rect = mapContainer.current!.getBoundingClientRect()
-          setPopup({
-            feature: feat,
-            x: e.originalEvent.clientX - rect.left,
-            y: e.originalEvent.clientY - rect.top,
-          })
-        }
-      })
-
-      map.on('mouseenter', 'cluster-layer', () => {
-        map.getCanvas().style.cursor = 'pointer'
-      })
-      map.on('mouseleave', 'cluster-layer', () => {
-        map.getCanvas().style.cursor = ''
-      })
-      map.on('mouseenter', 'unclustered-point', () => {
-        map.getCanvas().style.cursor = 'pointer'
-      })
-      map.on('mouseleave', 'unclustered-point', () => {
-        map.getCanvas().style.cursor = ''
-      })
+      applyData(geojsonRef.current)
+      extractLegend(geojsonRef.current)
     })
 
     map.on('error', (e) => {
       console.error('Map error:', e.error?.message || e)
+    })
+
+    map.on('click', 'cluster-layer', async (e) => {
+      const features = map.queryRenderedFeatures(e.point, { layers: ['cluster-layer'] })
+      const clusterId = features[0]?.properties?.cluster_id
+      if (clusterId && e.lngLat) {
+        const source = map.getSource('products') as maplibregl.GeoJSONSource
+        const zoom = await source.getClusterExpansionZoom(clusterId)
+        map.easeTo({ center: e.lngLat, zoom })
+      }
+    })
+
+    map.on('click', 'unclustered-point', (e) => {
+      const features = map.queryRenderedFeatures(e.point, { layers: ['unclustered-point'] })
+      if (features.length > 0 && e.lngLat) {
+        const feat = features[0] as unknown as GeoJSONFeature
+        setSelectedFeature({ feature: feat, lngLat: { lng: e.lngLat.lng, lat: e.lngLat.lat } })
+      }
+    })
+
+    map.on('click', (e) => {
+      const target = e.originalEvent.target as HTMLElement
+      if (target.closest('.map-glass') || target.closest('button') || target.closest('aside')) return
+      const features = map.queryRenderedFeatures(e.point)
+      if (features.length === 0 && onMapClick) {
+        onMapClick({ lng: e.lngLat.lng, lat: e.lngLat.lat })
+      }
+    })
+
+    map.on('mouseenter', 'cluster-layer', () => { map.getCanvas().style.cursor = 'pointer' })
+    map.on('mouseleave', 'cluster-layer', () => { map.getCanvas().style.cursor = '' })
+    map.on('mouseenter', 'unclustered-point', () => { map.getCanvas().style.cursor = 'pointer' })
+    map.on('mouseleave', 'unclustered-point', () => { map.getCanvas().style.cursor = '' })
+
+    map.on('mousemove', (e: maplibregl.MapMouseEvent) => {
+      setCoords({
+        lat: parseFloat(e.lngLat.lat.toFixed(4)),
+        lng: parseFloat(e.lngLat.lng.toFixed(4)),
+      })
     })
 
     mapRef.current = map
@@ -182,45 +229,47 @@ export default function MapContainer({ geojson, loading, error, onLegendReady }:
     }
   }, [])
 
+  // Update popup position on map move/zoom or selectedFeature change
   useEffect(() => {
-    if (geojson) {
-      applyData(geojson)
-
-      const colors = new Map<string, string>()
-      geojson.features.forEach((f) => {
-        const cat = f.properties.category
-        const col = f.properties.color
-        if (cat && col && !colors.has(cat)) {
-          colors.set(cat, col)
-        }
-      })
-      const legend = Array.from(colors.entries()).map(([label, color]) => ({ label, color }))
-      legendReadyRef.current(legend)
+    const map = mapRef.current
+    if (!map) return
+    updatePopupPosition()
+    map.on('move', updatePopupPosition)
+    map.on('zoom', updatePopupPosition)
+    return () => {
+      map.off('move', updatePopupPosition)
+      map.off('zoom', updatePopupPosition)
     }
+  }, [selectedFeature, updatePopupPosition])
+
+  // Apply data when geojson changes
+  useEffect(() => {
+    applyData(geojson)
+    extractLegend(geojson)
   }, [geojson, applyData])
 
-  const handleMouseMove = (e: React.MouseEvent) => {
-    const rect = mapContainer.current?.getBoundingClientRect()
-    if (!rect) return
-    const x = (e.clientX - rect.left) / rect.width
-    const y = (e.clientY - rect.top) / rect.height
-    const lng = 105 + x * 10
-    const lat = -5 - y * 5
-    setCoords({ lat: parseFloat(lat.toFixed(4)), lng: parseFloat(lng.toFixed(4)) })
+  // Theme change
+  const cycleTheme = () => {
+    const next = theme === 'standard' ? 'topographical' : theme === 'topographical' ? 'dark' : 'standard'
+    setTheme(next)
+    const map = mapRef.current
+    if (!map) return
+    mapReady.current = false
+    map.setStyle(getMapStyle(next))
+    map.once('style.load', () => reInitMapContent())
   }
 
-  const cycleTheme = () => {
-    setTheme((t) => (t === 'standard' ? 'topographical' : t === 'topographical' ? 'dark' : 'standard'))
+  const recenterMap = () => {
+    mapRef.current?.easeTo({ center: CENTER, zoom: ZOOM })
   }
+
+  const zoomIn = () => mapRef.current?.zoomIn()
+  const zoomOut = () => mapRef.current?.zoomOut()
 
   return (
-    <div
-      className="flex-1 relative w-full h-full overflow-hidden"
-      onMouseMove={handleMouseMove}
-      style={{ backgroundColor: THEME_BG[theme] }}
-    >
-      {/* MapLibre canvas */}
-      <div ref={mapContainer} className="absolute inset-0" style={{ opacity: theme === 'dark' ? 0.85 : 1 }} />
+    <div className="flex-1 relative w-full overflow-hidden" style={{ backgroundColor: THEME_BG[theme] }}>
+      {/* MapLibre canvas container — inline style avoids absolute class conflict with .maplibregl-map {position:relative} */}
+      <div ref={mapContainerRef} className="inset-0" style={{ position: 'absolute' }} />
 
       {/* Dot-grid overlay */}
       <div
@@ -243,22 +292,34 @@ export default function MapContainer({ geojson, loading, error, onLegendReady }:
         </svg>
       )}
 
-      {/* Theme toggle button */}
-      <div className="absolute right-6 top-20 z-30 map-glass rounded-xl shadow-md border border-surface-border overflow-hidden">
-        <button
-          onClick={cycleTheme}
-          className="p-3 hover:bg-white text-on-surface-variant hover:text-secondary transition-all cursor-pointer"
-          title={`Theme: ${theme}`}
-        >
-          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
-          </svg>
-        </button>
+      {/* Right-side controls */}
+      <div className="absolute right-6 top-6 z-30 flex flex-col gap-3">
+        <div className="map-glass flex flex-col rounded-xl shadow-md border border-surface-border overflow-hidden bg-white/90 backdrop-blur-md">
+          <button onClick={zoomIn} className="p-3 hover:bg-neutral-100 text-on-surface-variant hover:text-secondary transition-all border-b border-surface-border cursor-pointer flex justify-center items-center" title="Zoom In">
+            <Plus className="w-5 h-5" />
+          </button>
+          <button onClick={zoomOut} className="p-3 hover:bg-neutral-100 text-on-surface-variant hover:text-secondary transition-all cursor-pointer flex justify-center items-center" title="Zoom Out">
+            <Minus className="w-5 h-5" />
+          </button>
+        </div>
+        <div className="map-glass rounded-xl shadow-md border border-surface-border overflow-hidden bg-white/90 backdrop-blur-md relative group">
+          <button onClick={cycleTheme} className="p-3 hover:bg-neutral-100 text-on-surface-variant hover:text-secondary transition-all cursor-pointer flex justify-center items-center w-full" title="Toggle Map Layer">
+            <Layers className="w-5 h-5" />
+          </button>
+          <span className="absolute right-14 top-1.5 opacity-0 group-hover:opacity-100 transition-opacity bg-primary text-white text-xs px-2.5 py-1 rounded shadow-md whitespace-nowrap pointer-events-none capitalize z-40">
+            Overlay: {theme}
+          </span>
+        </div>
+        <div className="map-glass rounded-xl shadow-md border border-surface-border overflow-hidden bg-white/90 backdrop-blur-md">
+          <button onClick={recenterMap} className="p-3 hover:bg-neutral-100 text-on-surface-variant hover:text-secondary transition-all cursor-pointer flex justify-center items-center w-full" title="Recenter on Indonesia">
+            <Compass className="w-5 h-5" />
+          </button>
+        </div>
       </div>
 
       {/* Loading overlay */}
       {loading && (
-        <div className="absolute top-4 right-4 z-30 bg-black/60 text-white text-xs px-3 py-1.5 rounded-full">
+        <div className="absolute top-4 left-4 z-30 bg-black/60 text-white text-xs px-3 py-1.5 rounded-full">
           Loading map data...
         </div>
       )}
@@ -272,19 +333,19 @@ export default function MapContainer({ geojson, loading, error, onLegendReady }:
 
       {/* Coordinates HUD */}
       <div className="absolute bottom-6 right-6 z-40 bg-black/85 text-white/95 px-4 py-2 rounded-full font-mono-data text-xs tracking-widest backdrop-blur-md shadow-md border border-white/10 flex items-center gap-2 select-none">
-        <svg className="w-3.5 h-3.5 text-secondary" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
-        </svg>
-        <span>{coords.lat}° S, {coords.lng}° E</span>
+        <Compass className="w-3.5 h-3.5 text-secondary" />
+        <span>
+          {Math.abs(coords.lat)}° {coords.lat >= 0 ? 'N' : 'S'}, {Math.abs(coords.lng)}° {coords.lng >= 0 ? 'E' : 'W'}
+        </span>
       </div>
 
       {/* Popup */}
-      {popup && (
+      {selectedFeature && popupPos && (
         <MapPopup
-          feature={popup.feature}
-          x={popup.x}
-          y={popup.y}
-          onClose={() => setPopup(null)}
+          feature={selectedFeature.feature}
+          x={popupPos.x}
+          y={popupPos.y}
+          onClose={() => setSelectedFeature(null)}
         />
       )}
     </div>

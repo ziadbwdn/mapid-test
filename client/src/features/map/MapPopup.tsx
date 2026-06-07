@@ -35,7 +35,7 @@ export default function MapPopup({ feature, x, y, onClose }: MapPopupProps) {
       <div className="mt-1 flex flex-col gap-0.5">
         <p className="text-xs text-on-surface-variant">{p.category}</p>
         <p className="font-mono-data text-xs text-on-surface">
-          Revenue: ${p.total_revenue.toLocaleString()}
+          Revenue: ${(p.total_revenue ?? 0).toLocaleString()}
         </p>
         <span
           className={`text-[10px] font-bold mt-0.5 ${
