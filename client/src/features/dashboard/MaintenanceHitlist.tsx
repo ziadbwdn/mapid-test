@@ -5,8 +5,14 @@ import { ChartSkeleton } from '@/components/ui/Skeleton'
 import { ErrorState } from '@/components/ui/ErrorState'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { ChartInfoButton, ChartInfoModal } from '@/components/ui/ChartInfoModal'
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
 import { formatCompactCurrency } from '@/utils/formatters'
+
+const CATEGORY_COLORS: Record<string, string> = {
+  Accessories: '#3b82f6',
+  Bikes: '#10b981',
+  Clothing: '#f59e0b',
+}
 
 export default function MaintenanceHitlist() {
   const { data, loading, error, refetch } = useApiData<HitlistItem[]>('/analytics/maintenance-hitlist')
@@ -16,6 +22,11 @@ export default function MaintenanceHitlist() {
   if (error) return <ErrorState message={error} onRetry={refetch} />
   if (!data || data.length === 0) return <EmptyState message="No maintenance data" />
 
+  const chartData = data.map(d => ({
+    ...d,
+    total_profit: Number(d.total_profit),
+  }))
+
   return (
     <div className="bg-surface-container-lowest p-6 rounded-2xl shadow-sm border border-surface-border">
       <div className="flex items-center justify-between mb-4">
@@ -23,15 +34,19 @@ export default function MaintenanceHitlist() {
         <ChartInfoButton onClick={() => setInfoOpen(true)} />
       </div>
       <ResponsiveContainer width="100%" height={350}>
-        <BarChart data={data} layout="vertical">
+        <BarChart data={chartData} layout="vertical" margin={{ top: 10, right: 20, bottom: 40, left: 20 }}>
           <XAxis
             type="number"
             tick={{ fontSize: 11 }}
-            label={{ value: 'Total Profit (IDR)', position: 'bottom', fontSize: 11 }}
+            label={{ value: 'Total Profit ($)', position: 'bottom', fontSize: 11 }}
           />
           <YAxis type="category" dataKey="product_name" width={180} tick={{ fontSize: 10 }} />
           <Tooltip formatter={(value: number) => formatCompactCurrency(value)} />
-          <Bar dataKey="total_profit" fill="#ef4444" radius={[0, 4, 4, 0]} />
+          <Bar dataKey="total_profit" radius={[0, 4, 4, 0]}>
+            {chartData.map((entry, i) => (
+              <Cell key={i} fill={CATEGORY_COLORS[entry.category] || '#ef4444'} />
+            ))}
+          </Bar>
         </BarChart>
       </ResponsiveContainer>
 

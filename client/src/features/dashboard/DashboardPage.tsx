@@ -6,6 +6,7 @@ import HealthQuadrant from './HealthQuadrant'
 import ProfitByCategory from './ProfitByCategory'
 import MaintenanceHitlist from './MaintenanceHitlist'
 import ProductTable from './ProductTable'
+import CostVsProfitBoxplot from './CostVsProfitBoxplot'
 
 export default function DashboardPage() {
   return (
@@ -43,6 +44,12 @@ export default function DashboardPage() {
         </div>
         <div className="col-span-12 lg:col-span-6">
           <MaintenanceHitlist />
+        </div>
+      </section>
+
+      <section className="grid grid-cols-12 gap-6 mb-10">
+        <div className="col-span-12">
+          <CostVsProfitBoxplot />
         </div>
       </section>
 

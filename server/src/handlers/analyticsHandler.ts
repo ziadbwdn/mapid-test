@@ -10,6 +10,7 @@ interface AnalyticsService {
   getHealthQuadrant: () => Promise<unknown>
   getProfitByCategory: () => Promise<unknown>
   getMaintenanceHitlist: () => Promise<unknown>
+  getBoxplotData: () => Promise<unknown>
 }
 
 function analyticsHandler(analyticsSvc: AnalyticsService) {
@@ -46,6 +47,11 @@ function analyticsHandler(analyticsSvc: AnalyticsService) {
 
     getMaintenanceHitlist: asyncHandler(async (_req: Request, res: Response) => {
       const data = await analyticsSvc.getMaintenanceHitlist()
+      sendSuccess(res, data)
+    }),
+
+    getBoxplotData: asyncHandler(async (_req: Request, res: Response) => {
+      const data = await analyticsSvc.getBoxplotData()
       sendSuccess(res, data)
     })
   }

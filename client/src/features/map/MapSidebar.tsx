@@ -96,7 +96,7 @@ export default function MapSidebar({
   return (
     <aside className="absolute left-4 top-4 bottom-4 w-80 z-40 flex flex-col gap-4 pointer-events-none">
       {/* Header */}
-      <div className="map-glass rounded-2xl shadow-lg border border-surface-border p-5 flex items-center justify-between pointer-events-auto bg-white/90 backdrop-blur-md">
+      <div className="map-glass rounded-2xl shadow-lg border border-surface-border p-5 flex items-center justify-between pointer-events-auto bg-white/90 backdrop-blur-md flex-shrink-0">
         <div>
           <h2 className="font-headline-lg text-xl font-bold text-primary">Explorer</h2>
           <p className="font-label-sm text-xs font-semibold text-on-surface-variant uppercase tracking-wider">
@@ -112,8 +112,11 @@ export default function MapSidebar({
         </button>
       </div>
 
+      {/* Scrollable mid section */}
+      <div className="flex-1 min-h-0 overflow-y-auto pointer-events-auto scrollbar-thin space-y-4">
+
       {/* Accordion: Analysis */}
-      <div className="map-glass rounded-2xl shadow-lg border border-surface-border overflow-hidden pointer-events-auto bg-white/90 backdrop-blur-md">
+      <div className="map-glass rounded-2xl shadow-lg border border-surface-border pointer-events-auto bg-white/90 backdrop-blur-md">
         <button
           onClick={() => toggleSection('analysis')}
           className="w-full flex items-center justify-between p-5 cursor-pointer hover:bg-surface-container/50 transition-colors"
@@ -290,8 +293,10 @@ export default function MapSidebar({
         )}
       </div>
 
+      </div>{/* End scrollable mid section */}
+
       {/* Active Points mini-card */}
-      <div className="map-glass rounded-2xl shadow-lg border border-surface-border p-4 flex items-center justify-between pointer-events-auto bg-white/90 backdrop-blur-md">
+      <div className="map-glass rounded-2xl shadow-lg border border-surface-border p-4 flex items-center justify-between pointer-events-auto bg-white/90 backdrop-blur-md flex-shrink-0">
         <div>
           <p className="font-label-sm text-xs font-bold text-on-surface-variant uppercase tracking-wider">
             Active Points

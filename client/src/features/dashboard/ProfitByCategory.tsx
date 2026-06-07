@@ -5,8 +5,14 @@ import { ChartSkeleton } from '@/components/ui/Skeleton'
 import { ErrorState } from '@/components/ui/ErrorState'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { ChartInfoButton, ChartInfoModal } from '@/components/ui/ChartInfoModal'
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
 import { formatCompactCurrency } from '@/utils/formatters'
+
+const CATEGORY_COLORS: Record<string, string> = {
+  Accessories: '#3b82f6',
+  Bikes: '#10b981',
+  Clothing: '#f59e0b',
+}
 
 export default function ProfitByCategory() {
   const { data, loading, error, refetch } = useApiData<ProfitByCategoryType[]>('/analytics/profit-by-category')
@@ -18,6 +24,7 @@ export default function ProfitByCategory() {
 
   const chartData = data.map((d) => ({
     ...d,
+    total_profit: Number(d.total_profit),
     total_profit_fmt: formatCompactCurrency(d.total_profit),
   }))
 
@@ -28,15 +35,19 @@ export default function ProfitByCategory() {
         <ChartInfoButton onClick={() => setInfoOpen(true)} />
       </div>
       <ResponsiveContainer width="100%" height={300}>
-        <BarChart data={chartData}>
-          <XAxis dataKey="category_name" tick={{ fontSize: 12 }} />
+        <BarChart data={chartData} margin={{ top: 10, right: 20, bottom: 40, left: 70 }}>
+          <XAxis dataKey="category_name" tick={{ fontSize: 12 }} label={{ value: 'Category', position: 'bottom', fontSize: 11 }} />
           <YAxis
             tick={{ fontSize: 12 }}
             domain={[0, 'auto']}
-            label={{ value: 'Total Profit (IDR)', angle: -90, position: 'insideLeft', fontSize: 11 }}
+            label={{ value: 'Total Profit ($)', angle: -90, position: 'insideLeft', fontSize: 11 }}
           />
           <Tooltip formatter={(value: number) => formatCompactCurrency(value)} />
-          <Bar dataKey="total_profit" fill="#00668a" radius={[4, 4, 0, 0]} />
+          <Bar dataKey="total_profit" radius={[4, 4, 0, 0]}>
+            {chartData.map((entry, i) => (
+              <Cell key={i} fill={CATEGORY_COLORS[entry.category_name] || '#00668a'} />
+            ))}
+          </Bar>
         </BarChart>
       </ResponsiveContainer>
 

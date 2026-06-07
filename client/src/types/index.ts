@@ -102,6 +102,7 @@ export interface HealthQuadrant {
   sales_velocity: number
   profit_margin_pct: number
   total_profit: number
+  total_quantity: number
   quadrant: string
 }
 
@@ -116,6 +117,30 @@ export interface HitlistItem {
   category: string
   total_profit: number
   profit_margin_pct: number
+}
+
+export interface BoxplotOutlier {
+  product_name: string
+  total_profit: number
+}
+
+export interface BoxplotGroup {
+  category: string
+  cost_tier: string
+  tier_color: string
+  min: number
+  q1: number
+  median: number
+  q3: number
+  max: number
+  whisker_min: number
+  whisker_max: number
+  fliers: BoxplotOutlier[]
+}
+
+export interface BoxplotResponse {
+  groups: BoxplotGroup[]
+  bottom_10: BoxplotOutlier[]
 }
 
 export interface ProductQueryParams {

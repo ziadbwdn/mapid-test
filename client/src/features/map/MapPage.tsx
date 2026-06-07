@@ -52,6 +52,7 @@ export default function MapPage() {
   const [bufferCenter, setBufferCenter] = useState<{ lng: number; lat: number } | null>(null)
   const [bufferRadiusKm, setBufferRadiusKm] = useState(50)
   const [bufferResults, setBufferResults] = useState<GeoJSONCollection | null>(null)
+  const [layersReady, setLayersReady] = useState(false)
 
   const endpoint = '/map/geojson'
   const params: Record<string, string> = {}
@@ -60,6 +61,11 @@ export default function MapPage() {
   if (search) params.search = search
 
   const { data: geojson, loading, error } = useGeoJSON(endpoint, params)
+
+  // Reset layersReady when new data loads
+  useEffect(() => {
+    if (loading) setLayersReady(false)
+  }, [loading])
 
   const baseData = useMemo(
     () => getEffectiveData(geojson as GeoJSONCollection | null, loading, category, segment, search),
@@ -109,6 +115,10 @@ export default function MapPage() {
 
   const handleLegendReady = useCallback((items: { label: string; color: string }[]) => {
     setLegendItems(items)
+  }, [])
+
+  const handleLayersReady = useCallback(() => {
+    setLayersReady(true)
   }, [])
 
   // Ruler
@@ -215,6 +225,7 @@ export default function MapPage() {
         loading={loading}
         error={error}
         onLegendReady={handleLegendReady}
+        onLayersReady={handleLayersReady}
         rulerActive={rulerActive}
         bufferActive={bufferActive}
         bufferCenter={bufferCenter}

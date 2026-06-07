@@ -119,6 +119,7 @@ export interface BCGProduct {
   profit_margin_pct: number
   total_profit: number
   profit_per_unit: number
+  total_quantity: number
   quadrant: 'Star' | 'Workhorse' | 'Niche' | 'Dog'
 }
 
@@ -133,4 +134,28 @@ export interface HitlistItem {
   category: string
   total_profit: number
   profit_margin_pct: number
+}
+
+export interface BoxplotOutlier {
+  product_name: string
+  total_profit: number
+}
+
+export interface BoxplotGroup {
+  category: string
+  cost_tier: string
+  tier_color: string
+  min: number
+  q1: number
+  median: number
+  q3: number
+  max: number
+  whisker_min: number
+  whisker_max: number
+  fliers: BoxplotOutlier[]
+}
+
+export interface BoxplotResponse {
+  groups: BoxplotGroup[]
+  bottom_10: BoxplotOutlier[]
 }

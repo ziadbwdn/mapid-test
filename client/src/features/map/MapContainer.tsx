@@ -15,6 +15,7 @@ interface MapContainerProps {
   bufferCenter: { lng: number; lat: number } | null
   bufferRadiusKm: number
   onBufferApply: (center: { lng: number; lat: number }) => void
+  onLayersReady?: () => void
 }
 
 type ThemeMode = 'standard' | 'topographical' | 'dark' | 'satellite'
@@ -199,6 +200,7 @@ export default function MapContainer({
   bufferCenter,
   bufferRadiusKm,
   onBufferApply,
+  onLayersReady,
 }: MapContainerProps) {
   const mapContainerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<maplibregl.Map | null>(null)
@@ -224,10 +226,16 @@ export default function MapContainer({
   rulerActiveRef.current = rulerActive
   const bufferActiveRef = useRef(bufferActive)
   bufferActiveRef.current = bufferActive
+  const bufferCenterRef = useRef(bufferCenter)
+  bufferCenterRef.current = bufferCenter
+  const bufferRadiusKmRef = useRef(bufferRadiusKm)
+  bufferRadiusKmRef.current = bufferRadiusKm
   const onBufferApplyRef = useRef(onBufferApply)
   onBufferApplyRef.current = onBufferApply
   const onMapClickRef = useRef(onMapClick)
   onMapClickRef.current = onMapClick
+  const onLayersReadyRef = useRef(onLayersReady)
+  onLayersReadyRef.current = onLayersReady
 
   const applyData = useCallback((data: GeoJSONCollection) => {
     const map = mapRef.current
@@ -286,13 +294,15 @@ export default function MapContainer({
     if (!map || !mapReady.current) return
     const source = map.getSource('buffer-circle') as maplibregl.GeoJSONSource | undefined
     if (!source) return
-    if (bufferCenter && bufferRadiusKm > 0) {
-      const circle = createCircleGeoJSON([bufferCenter.lng, bufferCenter.lat], bufferRadiusKm)
+    const center = bufferCenterRef.current
+    const radius = bufferRadiusKmRef.current
+    if (center && radius > 0) {
+      const circle = createCircleGeoJSON([center.lng, center.lat], radius)
       source.setData({ type: 'FeatureCollection', features: [circle] })
     } else {
       source.setData({ type: 'FeatureCollection', features: [] })
     }
-  }, [bufferCenter, bufferRadiusKm])
+  }, [])
 
   const reInitMapContent = useCallback(() => {
     const map = mapRef.current
@@ -303,6 +313,7 @@ export default function MapContainer({
     extractLegend(geojsonRef.current)
     updateRulerLayers()
     updateBufferLayer()
+    onLayersReadyRef.current?.()
   }, [applyData, updateRulerLayers, updateBufferLayer])
 
   const updatePopupPosition = useCallback(() => {
@@ -461,8 +472,10 @@ export default function MapContainer({
 
   // Update buffer layer when center/radius changes
   useEffect(() => {
+    bufferCenterRef.current = bufferCenter
+    bufferRadiusKmRef.current = bufferRadiusKm
     updateBufferLayer()
-  }, [updateBufferLayer])
+  }, [bufferCenter, bufferRadiusKm, updateBufferLayer])
 
   // Theme change
   const setThemeMode = (next: ThemeMode) => {
@@ -470,9 +483,29 @@ export default function MapContainer({
     setTheme(next)
     const map = mapRef.current
     if (!map) return
+    // Save current view state before switching
+    const savedCenter = map.getCenter()
+    const savedZoom = map.getZoom()
     mapReady.current = false
+    let fallbackTimer: ReturnType<typeof setTimeout> | null = null
+
+    const onStyleReady = () => {
+      if (fallbackTimer) clearTimeout(fallbackTimer)
+      map.easeTo({ center: savedCenter, zoom: savedZoom, duration: 0 })
+      reInitMapContent()
+    }
+
+    const onIdleFallback = () => {
+      if (!mapReady.current) {
+        console.warn('[MapContainer] style.load not fired, using idle fallback')
+        onStyleReady()
+      }
+    }
+
+    map.once('style.load', onStyleReady)
+    // Fallback: if style.load doesn't fire within 10s, try idle
+    fallbackTimer = setTimeout(() => map.once('idle', onIdleFallback), 10000)
     map.setStyle(getMapStyle(next))
-    map.once('style.load', () => reInitMapContent())
   }
 
   const recenterMap = () => {

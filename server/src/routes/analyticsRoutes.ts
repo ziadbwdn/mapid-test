@@ -15,6 +15,7 @@ function analyticsRoutes(pool: Pool): Router {
   router.get('/health-quadrant', handler.getHealthQuadrant)
   router.get('/profit-by-category', handler.getProfitByCategory)
   router.get('/maintenance-hitlist', handler.getMaintenanceHitlist)
+  router.get('/boxplot-data', handler.getBoxplotData)
 
   return router
 }

@@ -15,6 +15,11 @@ export default function CategoryChart() {
   if (error) return <ErrorState message={error} onRetry={refetch} />
   if (!data || data.length === 0) return <EmptyState message="No category data" />
 
+  const chartData = data.map(d => ({
+    ...d,
+    product_count: Number(d.product_count),
+  }))
+
   return (
     <div className="bg-surface-container-lowest p-6 rounded-2xl shadow-sm border border-surface-border">
       <div className="flex items-center justify-between mb-4">
@@ -22,18 +27,18 @@ export default function CategoryChart() {
         <ChartInfoButton onClick={() => setInfoOpen(true)} />
       </div>
       <ResponsiveContainer width="100%" height={300}>
-        <BarChart data={data} barCategoryGap="20%" barGap={4}>
-          <XAxis dataKey="dimension_value" tick={{ fontSize: 12 }} axisLine={{ stroke: '#e2e8f0' }} tickLine={false} />
+        <BarChart data={chartData} barCategoryGap="20%" barGap={4} margin={{ top: 10, right: 20, bottom: 40, left: 50 }}>
+          <XAxis dataKey="dimension_value" tick={{ fontSize: 12 }} axisLine={{ stroke: '#e2e8f0' }} tickLine={false} label={{ value: 'Category', position: 'bottom', fontSize: 11 }} />
           <YAxis
             tick={{ fontSize: 12 }}
             domain={[0, 'auto']}
             axisLine={{ stroke: '#e2e8f0' }}
             tickLine={false}
-            label={{ value: 'Product Count', angle: -90, position: 'insideLeft', fontSize: 11 }}
+            label={{ value: 'Number of Products', angle: -90, position: 'insideLeft', fontSize: 11 }}
           />
           <Tooltip />
           <Bar dataKey="product_count" radius={[4, 4, 0, 0]} maxBarSize={60}>
-            {data.map((entry, i) => (
+            {chartData.map((entry, i) => (
               <Cell key={i} fill={entry.color_code} />
             ))}
           </Bar>
