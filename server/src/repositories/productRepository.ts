@@ -33,6 +33,18 @@ function productRepository(pool: Pool) {
     return rows[0] || null
   }
 
+  async function getProductsWithinRadius(
+    longitude: number,
+    latitude: number,
+    radiusMeters: number
+  ): Promise<Record<string, unknown>[]> {
+    const { rows } = await pool.query(
+      'SELECT * FROM get_products_within_radius($1, $2, $3)',
+      [longitude, latitude, radiusMeters]
+    )
+    return rows
+  }
+
   async function getLookupTables(): Promise<LookupTables> {
     const { rows: categories } = await pool.query('SELECT id, name FROM categories')
     const { rows: subCategories } = await pool.query(`
@@ -56,6 +68,7 @@ function productRepository(pool: Pool) {
     getPaginated,
     getAllProducts,
     findProductByKey,
+    getProductsWithinRadius,
     getLookupTables
   }
 }

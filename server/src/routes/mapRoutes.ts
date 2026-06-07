@@ -9,6 +9,7 @@ function mapRoutes(pool: Pool): Router {
   const handler = mapHandler(mapSvc)
 
   router.get('/geojson', handler.getGeoJSON)
+  router.get('/radius-search', handler.getRadiusSearch)
 
   return router
 }

@@ -9,7 +9,15 @@ function mapService(pool: Pool) {
     return productRepo.getGeoJSON(filters)
   }
 
-  return { getGeoJSON }
+  async function getRadiusSearch(
+    longitude: number,
+    latitude: number,
+    radiusMeters: number
+  ): Promise<Record<string, unknown>[]> {
+    return productRepo.getProductsWithinRadius(longitude, latitude, radiusMeters)
+  }
+
+  return { getGeoJSON, getRadiusSearch }
 }
 
 export default mapService

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import maplibregl from 'maplibre-gl'
-import { Plus, Minus, Layers, Compass } from 'lucide-react'
+import { Plus, Minus, Compass } from 'lucide-react'
 import type { GeoJSONCollection, GeoJSONFeature } from '@/types'
 import MapPopup from './MapPopup'
 
@@ -10,28 +10,47 @@ interface MapContainerProps {
   error: string | null
   onLegendReady: (legend: { label: string; color: string }[]) => void
   onMapClick?: (lngLat: { lng: number; lat: number }) => void
+  rulerActive: boolean
+  bufferActive: boolean
+  bufferCenter: { lng: number; lat: number } | null
+  bufferRadiusKm: number
+  onBufferApply: (center: { lng: number; lat: number }) => void
 }
 
-type ThemeMode = 'standard' | 'topographical' | 'dark'
+type ThemeMode = 'standard' | 'topographical' | 'dark' | 'satellite'
 
 const CENTER: [number, number] = [110, -7.5]
 const ZOOM = 6
 
-const getMapStyle = (theme: ThemeMode) => {
-  let tilesUrl = 'https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png'
-  if (theme === 'dark') {
-    tilesUrl = 'https://basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png'
-  } else if (theme === 'topographical') {
-    tilesUrl = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
-  }
+const THEME_TILES: Record<ThemeMode, { url: string; attr: string }> = {
+  standard: {
+    url: 'https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png',
+    attr: '© OpenStreetMap contributors, CARTO',
+  },
+  topographical: {
+    url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+    attr: '© OpenStreetMap contributors',
+  },
+  dark: {
+    url: 'https://basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',
+    attr: '© OpenStreetMap contributors, CARTO',
+  },
+  satellite: {
+    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+    attr: 'Tiles © Esri — Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community',
+  },
+}
+
+function getMapStyle(theme: ThemeMode) {
+  const tile = THEME_TILES[theme]
   return {
     version: 8 as const,
     sources: {
       'raster-tiles': {
         type: 'raster' as const,
-        tiles: [tilesUrl],
+        tiles: [tile.url],
         tileSize: 256,
-        attribution: '© OpenStreetMap contributors, CARTO',
+        attribution: tile.attr,
       },
     },
     layers: [
@@ -44,6 +63,39 @@ const THEME_BG: Record<ThemeMode, string> = {
   standard: '#f7f9fb',
   topographical: '#eceef0',
   dark: '#131b2e',
+  satellite: '#0a0a0a',
+}
+
+function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number) {
+  const R = 6371
+  const dLat = ((lat2 - lat1) * Math.PI) / 180
+  const dLon = ((lng2 - lng1) * Math.PI) / 180
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2)
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+  return R * c
+}
+
+function createCircleGeoJSON(center: [number, number], radiusKm: number, points = 64): GeoJSON.Feature {
+  const coords: [number, number][] = []
+  const distanceX = radiusKm / (111.32 * Math.cos((center[1] * Math.PI) / 180))
+  const distanceY = radiusKm / 110.574
+  for (let i = 0; i < points; i++) {
+    const theta = (i / points) * (2 * Math.PI)
+    const x = distanceX * Math.cos(theta)
+    const y = distanceY * Math.sin(theta)
+    coords.push([center[0] + x, center[1] + y])
+  }
+  coords.push(coords[0])
+  return {
+    type: 'Feature',
+    geometry: { type: 'Polygon', coordinates: [coords] },
+    properties: {},
+  }
 }
 
 function initSourcesAndLayers(map: maplibregl.Map, data: GeoJSONCollection) {
@@ -99,9 +151,55 @@ function initSourcesAndLayers(map: maplibregl.Map, data: GeoJSONCollection) {
       'circle-stroke-color': '#ffffff',
     },
   })
+
+  // Ruler sources
+  map.addSource('ruler-line', {
+    type: 'geojson',
+    data: { type: 'FeatureCollection', features: [] },
+  })
+  map.addLayer({
+    id: 'ruler-line',
+    type: 'line',
+    source: 'ruler-line',
+    paint: { 'line-color': '#00668a', 'line-width': 2, 'line-dasharray': [4, 2] },
+  })
+
+  map.addSource('ruler-points', {
+    type: 'geojson',
+    data: { type: 'FeatureCollection', features: [] },
+  })
+  map.addLayer({
+    id: 'ruler-points',
+    type: 'circle',
+    source: 'ruler-points',
+    paint: { 'circle-color': '#00668a', 'circle-radius': 5, 'circle-stroke-width': 2, 'circle-stroke-color': '#ffffff' },
+  })
+
+  // Buffer source
+  map.addSource('buffer-circle', {
+    type: 'geojson',
+    data: { type: 'FeatureCollection', features: [] },
+  })
+  map.addLayer({
+    id: 'buffer-circle',
+    type: 'fill',
+    source: 'buffer-circle',
+    paint: { 'fill-color': 'rgba(0,102,138,0.15)', 'fill-outline-color': '#00668a' },
+  })
 }
 
-export default function MapContainer({ geojson, loading, error, onLegendReady, onMapClick }: MapContainerProps) {
+export default function MapContainer({
+  geojson,
+  loading,
+  error,
+  onLegendReady,
+  onMapClick,
+  rulerActive,
+  bufferActive,
+  bufferCenter,
+  bufferRadiusKm,
+  onBufferApply,
+}: MapContainerProps) {
   const mapContainerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<maplibregl.Map | null>(null)
   const mapReady = useRef(false)
@@ -112,12 +210,24 @@ export default function MapContainer({ geojson, loading, error, onLegendReady, o
     lngLat: { lng: number; lat: number }
   } | null>(null)
   const [popupPos, setPopupPos] = useState<{ x: number; y: number } | null>(null)
+  const [rulerPopup, setRulerPopup] = useState<{ lng: number; lat: number; text: string } | null>(null)
+  const [rulerPoints, setRulerPoints] = useState<{ lng: number; lat: number }[]>([])
   const legendReadyRef = useRef(onLegendReady)
   legendReadyRef.current = onLegendReady
   const geojsonRef = useRef(geojson)
   geojsonRef.current = geojson
   const selectedFeatureRef = useRef(selectedFeature)
   selectedFeatureRef.current = selectedFeature
+  const rulerPointsRef = useRef(rulerPoints)
+  rulerPointsRef.current = rulerPoints
+  const rulerActiveRef = useRef(rulerActive)
+  rulerActiveRef.current = rulerActive
+  const bufferActiveRef = useRef(bufferActive)
+  bufferActiveRef.current = bufferActive
+  const onBufferApplyRef = useRef(onBufferApply)
+  onBufferApplyRef.current = onBufferApply
+  const onMapClickRef = useRef(onMapClick)
+  onMapClickRef.current = onMapClick
 
   const applyData = useCallback((data: GeoJSONCollection) => {
     const map = mapRef.current
@@ -126,6 +236,64 @@ export default function MapContainer({ geojson, loading, error, onLegendReady, o
     if (source) source.setData(data)
   }, [])
 
+  const updateRulerLayers = useCallback(() => {
+    const map = mapRef.current
+    if (!map || !mapReady.current) return
+    const pts = rulerPointsRef.current
+    const lineSource = map.getSource('ruler-line') as maplibregl.GeoJSONSource | undefined
+    const pointSource = map.getSource('ruler-points') as maplibregl.GeoJSONSource | undefined
+    if (!lineSource || !pointSource) return
+
+    if (pts.length === 2) {
+      lineSource.setData({
+        type: 'FeatureCollection',
+        features: [
+          {
+            type: 'Feature',
+            geometry: { type: 'LineString', coordinates: pts.map((p) => [p.lng, p.lat]) },
+            properties: {},
+          },
+        ],
+      })
+      pointSource.setData({
+        type: 'FeatureCollection',
+        features: pts.map((p) => ({
+          type: 'Feature',
+          geometry: { type: 'Point', coordinates: [p.lng, p.lat] },
+          properties: {},
+        })),
+      })
+    } else if (pts.length === 1) {
+      lineSource.setData({ type: 'FeatureCollection', features: [] })
+      pointSource.setData({
+        type: 'FeatureCollection',
+        features: [
+          {
+            type: 'Feature',
+            geometry: { type: 'Point', coordinates: [pts[0].lng, pts[0].lat] },
+            properties: {},
+          },
+        ],
+      })
+    } else {
+      lineSource.setData({ type: 'FeatureCollection', features: [] })
+      pointSource.setData({ type: 'FeatureCollection', features: [] })
+    }
+  }, [])
+
+  const updateBufferLayer = useCallback(() => {
+    const map = mapRef.current
+    if (!map || !mapReady.current) return
+    const source = map.getSource('buffer-circle') as maplibregl.GeoJSONSource | undefined
+    if (!source) return
+    if (bufferCenter && bufferRadiusKm > 0) {
+      const circle = createCircleGeoJSON([bufferCenter.lng, bufferCenter.lat], bufferRadiusKm)
+      source.setData({ type: 'FeatureCollection', features: [circle] })
+    } else {
+      source.setData({ type: 'FeatureCollection', features: [] })
+    }
+  }, [bufferCenter, bufferRadiusKm])
+
   const reInitMapContent = useCallback(() => {
     const map = mapRef.current
     if (!map) return
@@ -133,7 +301,9 @@ export default function MapContainer({ geojson, loading, error, onLegendReady, o
     mapReady.current = true
     applyData(geojsonRef.current)
     extractLegend(geojsonRef.current)
-  }, [applyData])
+    updateRulerLayers()
+    updateBufferLayer()
+  }, [applyData, updateRulerLayers, updateBufferLayer])
 
   const updatePopupPosition = useCallback(() => {
     const map = mapRef.current
@@ -176,6 +346,8 @@ export default function MapContainer({ geojson, loading, error, onLegendReady, o
       mapReady.current = true
       applyData(geojsonRef.current)
       extractLegend(geojsonRef.current)
+      updateRulerLayers()
+      updateBufferLayer()
     })
 
     map.on('error', (e) => {
@@ -203,9 +375,43 @@ export default function MapContainer({ geojson, loading, error, onLegendReady, o
     map.on('click', (e) => {
       const target = e.originalEvent.target as HTMLElement
       if (target.closest('.map-glass') || target.closest('button') || target.closest('aside')) return
+
+      // Ruler mode
+      if (rulerPointsRef.current.length < 2) {
+        // allow pass-through; handled below
+      }
+
+      const lngLat = { lng: e.lngLat.lng, lat: e.lngLat.lat }
+
+      if (rulerActiveRef.current) {
+        setRulerPoints((prev) => {
+          const next = prev.length >= 2 ? [lngLat] : [...prev, lngLat]
+          if (next.length === 2) {
+            const dist = haversineKm(next[0].lat, next[0].lng, next[1].lat, next[1].lng)
+            setRulerPopup({
+              lng: (next[0].lng + next[1].lng) / 2,
+              lat: (next[0].lat + next[1].lat) / 2,
+              text: `${dist.toFixed(2)} km`,
+            })
+            // Clear after 3 seconds
+            setTimeout(() => {
+              setRulerPopup(null)
+              setRulerPoints([])
+            }, 3000)
+          }
+          return next
+        })
+        return
+      }
+
+      if (bufferActiveRef.current) {
+        onBufferApplyRef.current(lngLat)
+        return
+      }
+
       const features = map.queryRenderedFeatures(e.point)
-      if (features.length === 0 && onMapClick) {
-        onMapClick({ lng: e.lngLat.lng, lat: e.lngLat.lat })
+      if (features.length === 0 && onMapClickRef.current) {
+        onMapClickRef.current(lngLat)
       }
     })
 
@@ -229,7 +435,7 @@ export default function MapContainer({ geojson, loading, error, onLegendReady, o
     }
   }, [])
 
-  // Update popup position on map move/zoom or selectedFeature change
+  // Update popup position
   useEffect(() => {
     const map = mapRef.current
     if (!map) return
@@ -248,9 +454,19 @@ export default function MapContainer({ geojson, loading, error, onLegendReady, o
     extractLegend(geojson)
   }, [geojson, applyData])
 
+  // Update ruler layers when rulerPoints changes
+  useEffect(() => {
+    updateRulerLayers()
+  }, [rulerPoints, updateRulerLayers])
+
+  // Update buffer layer when center/radius changes
+  useEffect(() => {
+    updateBufferLayer()
+  }, [updateBufferLayer])
+
   // Theme change
-  const cycleTheme = () => {
-    const next = theme === 'standard' ? 'topographical' : theme === 'topographical' ? 'dark' : 'standard'
+  const setThemeMode = (next: ThemeMode) => {
+    if (next === theme) return
     setTheme(next)
     const map = mapRef.current
     if (!map) return
@@ -266,31 +482,22 @@ export default function MapContainer({ geojson, loading, error, onLegendReady, o
   const zoomIn = () => mapRef.current?.zoomIn()
   const zoomOut = () => mapRef.current?.zoomOut()
 
+  const themes: ThemeMode[] = ['standard', 'topographical', 'dark', 'satellite']
+
   return (
     <div className="flex-1 relative w-full overflow-hidden" style={{ backgroundColor: THEME_BG[theme] }}>
-      {/* MapLibre canvas container — inline style avoids absolute class conflict with .maplibregl-map {position:relative} */}
+      {/* MapLibre canvas container */}
       <div ref={mapContainerRef} className="inset-0" style={{ position: 'absolute' }} />
 
       {/* Dot-grid overlay */}
       <div
         className="absolute inset-0 pointer-events-none transition-opacity duration-300"
         style={{
-          backgroundImage: `radial-gradient(${theme === 'dark' ? 'rgba(255,255,255,0.12)' : '#c6c6cd'} 1.5px, transparent 1.5px)`,
+          backgroundImage: `radial-gradient(${theme === 'dark' || theme === 'satellite' ? 'rgba(255,255,255,0.12)' : '#c6c6cd'} 1.5px, transparent 1.5px)`,
           backgroundSize: '24px 24px',
-          opacity: theme === 'dark' ? 0.5 : 0.6,
+          opacity: theme === 'dark' || theme === 'satellite' ? 0.5 : 0.6,
         }}
       />
-
-      {/* Topographical contour lines */}
-      {theme === 'topographical' && (
-        <svg className="absolute inset-0 w-full h-full pointer-events-none opacity-20" viewBox="0 0 1000 800" preserveAspectRatio="none">
-          <path d="M 50,100 C 150,120 200,80 350,150 S 500,300 650,220 S 800,280 950,200" fill="none" stroke="#00668a" strokeWidth="2" />
-          <path d="M 30,130 C 130,150 180,110 330,180 S 480,330 630,250 S 780,310 930,230" fill="none" stroke="#00668a" strokeWidth="1.5" />
-          <path d="M 10,160 C 110,180 160,140 310,210 S 460,360 610,280 S 760,340 910,260" fill="none" stroke="#00668a" strokeWidth="1" />
-          <path d="M 120,400 C 220,420 300,350 480,480 S 720,550 850,420" fill="none" stroke="#00668a" strokeWidth="2" />
-          <path d="M 100,430 C 200,450 280,380 460,510 S 700,580 830,450" fill="none" stroke="#00668a" strokeWidth="1.2" />
-        </svg>
-      )}
 
       {/* Right-side controls */}
       <div className="absolute right-6 top-6 z-30 flex flex-col gap-3">
@@ -302,19 +509,38 @@ export default function MapContainer({ geojson, loading, error, onLegendReady, o
             <Minus className="w-5 h-5" />
           </button>
         </div>
-        <div className="map-glass rounded-xl shadow-md border border-surface-border overflow-hidden bg-white/90 backdrop-blur-md relative group">
-          <button onClick={cycleTheme} className="p-3 hover:bg-neutral-100 text-on-surface-variant hover:text-secondary transition-all cursor-pointer flex justify-center items-center w-full" title="Toggle Map Layer">
-            <Layers className="w-5 h-5" />
-          </button>
-          <span className="absolute right-14 top-1.5 opacity-0 group-hover:opacity-100 transition-opacity bg-primary text-white text-xs px-2.5 py-1 rounded shadow-md whitespace-nowrap pointer-events-none capitalize z-40">
-            Overlay: {theme}
-          </span>
-        </div>
         <div className="map-glass rounded-xl shadow-md border border-surface-border overflow-hidden bg-white/90 backdrop-blur-md">
           <button onClick={recenterMap} className="p-3 hover:bg-neutral-100 text-on-surface-variant hover:text-secondary transition-all cursor-pointer flex justify-center items-center w-full" title="Recenter on Indonesia">
             <Compass className="w-5 h-5" />
           </button>
         </div>
+      </div>
+
+      {/* Bottom-right: Layer pill switcher */}
+      <div className="absolute bottom-6 right-6 z-40">
+        <div className="map-glass rounded-full shadow-md border border-surface-border p-1 flex gap-1 bg-white/90 backdrop-blur-md">
+          {themes.map((t) => (
+            <button
+              key={t}
+              onClick={() => setThemeMode(t)}
+              className={`px-3 py-1.5 rounded-full text-xs font-label-sm font-semibold transition-all cursor-pointer capitalize ${
+                theme === t
+                  ? 'bg-secondary text-white'
+                  : 'text-on-surface-variant hover:text-secondary hover:bg-surface-container'
+              }`}
+            >
+              {t === 'topographical' ? 'Topo' : t}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Bottom-left: Coordinates HUD */}
+      <div className="absolute bottom-6 left-[22rem] z-40 bg-black/85 text-white/95 px-4 py-2 rounded-full font-mono-data text-xs tracking-widest backdrop-blur-md shadow-md border border-white/10 flex items-center gap-2 select-none">
+        <Compass className="w-3.5 h-3.5 text-secondary" />
+        <span>
+          {Math.abs(coords.lat)}° {coords.lat >= 0 ? 'N' : 'S'}, {Math.abs(coords.lng)}° {coords.lng >= 0 ? 'E' : 'W'}
+        </span>
       </div>
 
       {/* Loading overlay */}
@@ -331,13 +557,19 @@ export default function MapContainer({ geojson, loading, error, onLegendReady, o
         </div>
       )}
 
-      {/* Coordinates HUD */}
-      <div className="absolute bottom-6 right-6 z-40 bg-black/85 text-white/95 px-4 py-2 rounded-full font-mono-data text-xs tracking-widest backdrop-blur-md shadow-md border border-white/10 flex items-center gap-2 select-none">
-        <Compass className="w-3.5 h-3.5 text-secondary" />
-        <span>
-          {Math.abs(coords.lat)}° {coords.lat >= 0 ? 'N' : 'S'}, {Math.abs(coords.lng)}° {coords.lng >= 0 ? 'E' : 'W'}
-        </span>
-      </div>
+      {/* Ruler popup */}
+      {rulerPopup && (
+        <div
+          className="absolute z-50 bg-secondary text-white text-xs px-3 py-1.5 rounded-lg shadow-lg pointer-events-none font-semibold"
+          style={{
+            left: mapRef.current ? mapRef.current.project([rulerPopup.lng, rulerPopup.lat]).x : 0,
+            top: mapRef.current ? mapRef.current.project([rulerPopup.lng, rulerPopup.lat]).y - 28 : 0,
+            transform: 'translateX(-50%)',
+          }}
+        >
+          {rulerPopup.text}
+        </div>
+      )}
 
       {/* Popup */}
       {selectedFeature && popupPos && (

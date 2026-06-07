@@ -1,8 +1,10 @@
+import { useState } from 'react'
 import { useApiData } from '@/hooks/useApiData'
 import type { HealthQuadrant as HealthQuadrantType } from '@/types'
 import { ChartSkeleton } from '@/components/ui/Skeleton'
 import { ErrorState } from '@/components/ui/ErrorState'
 import { EmptyState } from '@/components/ui/EmptyState'
+import { ChartInfoButton, ChartInfoModal } from '@/components/ui/ChartInfoModal'
 import {
   ScatterChart, Scatter, XAxis, YAxis, Tooltip, ResponsiveContainer, ZAxis, Legend,
 } from 'recharts'
@@ -16,6 +18,7 @@ const QUADRANT_COLORS: Record<string, string> = {
 
 export default function HealthQuadrant() {
   const { data, loading, error, refetch } = useApiData<HealthQuadrantType[]>('/analytics/health-quadrant')
+  const [infoOpen, setInfoOpen] = useState(false)
 
   if (loading) return <ChartSkeleton height={350} />
   if (error) return <ErrorState message={error} onRetry={refetch} />
@@ -30,7 +33,10 @@ export default function HealthQuadrant() {
 
   return (
     <div className="bg-surface-container-lowest p-6 rounded-2xl shadow-sm border border-surface-border">
-      <h3 className="font-headline-lg text-lg font-bold text-primary mb-4">Health Quadrant (BCG Matrix)</h3>
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="font-headline-lg text-lg font-bold text-primary">Health Quadrant (BCG Matrix)</h3>
+        <ChartInfoButton onClick={() => setInfoOpen(true)} />
+      </div>
       <ResponsiveContainer width="100%" height={350}>
         <ScatterChart>
           <XAxis
@@ -59,6 +65,28 @@ export default function HealthQuadrant() {
           ))}
         </ScatterChart>
       </ResponsiveContainer>
+
+      <ChartInfoModal open={infoOpen} title="Health Quadrant (BCG Matrix)" onClose={() => setInfoOpen(false)}>
+        <div className="space-y-3">
+          <p className="font-semibold text-secondary">⭐ Stars — top-right</p>
+          <p>High volume + high margin = mesin pertumbuhan. Prioritaskan ketersediaan stok, marketing spend, dan relasi supplier.</p>
+
+          <p className="font-semibold text-secondary">🐎 Workhorses — bottom-right</p>
+          <p>High volume + low margin = masalah harga/biaya. Renegosiasi supplier, kenaikan harga selektif, atau bundling dengan item margin tinggi.</p>
+
+          <p className="font-semibold text-secondary">💎 Niche gems — top-left</p>
+          <p>Low volume + high margin = profit tersembunyi. Pertimbangkan promosi target untuk geser ke Star; jika tidak, tetap sebagai SKU premium.</p>
+
+          <p className="font-semibold text-secondary">🔻 Dogs — bottom-left</p>
+          <p>Low volume + low margin = kandidat diskontinu. Menghabiskan modal dan rak tanpa return.</p>
+
+          <p className="font-semibold text-secondary">💡 Bubble size</p>
+          <p>Ukuran bubble = total profit. Besar di Workhorse = efek volume; kecil di Star = peluang skala.</p>
+
+          <p className="font-semibold text-secondary">🎯 Rekomendasi</p>
+          <p>Fokus pada produk di dekat garis median. Intervensi kecil (price adjustment, promotion) bisa menggeser kuadran klasifikasinya.</p>
+        </div>
+      </ChartInfoModal>
     </div>
   )
 }
