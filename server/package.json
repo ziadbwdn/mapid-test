@@ -5,7 +5,7 @@
   "main": "src/app.ts",
   "scripts": {
     "dev": "tsx watch src/app.ts",
-    "start": "tsx src/app.ts",
+    "start": "tsx src/migrate.ts && tsx src/app.ts",
     "migrate": "tsx src/migrate.ts",
     "build": "tsc",
     "typecheck": "tsc --noEmit",
