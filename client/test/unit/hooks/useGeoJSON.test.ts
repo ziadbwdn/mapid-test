@@ -23,7 +23,7 @@ describe('useGeoJSON', () => {
     }
     vi.spyOn(globalThis, 'fetch').mockResolvedValue({
       ok: true,
-      json: () => Promise.resolve(geojson)
+      json: () => Promise.resolve({ success: true, data: geojson })
     } as Response)
 
     const { result } = renderHook(() => useGeoJSON('/map/geojson'))
@@ -46,7 +46,7 @@ describe('useGeoJSON', () => {
   it('passes params as query string', async () => {
     const mockFetch = vi.spyOn(globalThis, 'fetch').mockResolvedValue({
       ok: true,
-      json: () => Promise.resolve({ type: 'FeatureCollection', features: [] })
+      json: () => Promise.resolve({ success: true, data: { type: 'FeatureCollection', features: [] } })
     } as Response)
 
     renderHook(() => useGeoJSON('/map/geojson', { category: 'Bikes', segment: 'High-Performer' }))
