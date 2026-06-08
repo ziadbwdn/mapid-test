@@ -3,19 +3,19 @@ version: "3.9"
 services:
   db:
     image: postgis/postgis:14-3.4
-    container_name: mapid-db
+    container_name: webgis-store-db
     restart: unless-stopped
     env_file: ./server/.env
     environment:
-      POSTGRES_DB: mapid
-      POSTGRES_USER: mapid
-      POSTGRES_PASSWORD: mapid_pass
+      POSTGRES_DB: webgis_store
+      POSTGRES_USER: webgis_store
+      POSTGRES_PASSWORD: webgis_store_pass
     ports:
       - "5432:5432"
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - webgis-store-pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U mapid -d mapid"]
+      test: ["CMD-SHELL", "pg_isready -U webgis_store -d webgis_store"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -24,11 +24,11 @@ services:
     build:
       context: ./server
       dockerfile: Dockerfile
-    container_name: mapid-server
+    container_name: webgis-store-server
     restart: unless-stopped
     env_file: ./server/.env
     environment:
-      DATABASE_URL: postgres://mapid:mapid_pass@db:5432/mapid
+      DATABASE_URL: postgres://webgis_store:webgis_store_pass@db:5432/webgis_store
       PORT: 3001
       NODE_ENV: production
       CORS_ORIGIN: http://localhost:3000
@@ -44,7 +44,7 @@ services:
     build:
       context: ./client
       dockerfile: Dockerfile
-    container_name: mapid-client
+    container_name: webgis-store-client
     restart: unless-stopped
     ports:
       - "3000:80"
@@ -52,4 +52,4 @@ services:
       - server
 
 volumes:
-  pgdata:
+  webgis-store-pgdata:

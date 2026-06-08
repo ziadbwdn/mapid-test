@@ -1,5 +1,5 @@
 {
-  "name": "mapid-server",
+  "name": "webgis-store",
   "version": "1.0.0",
   "description": "Product Analytics API with Express.js and PostgreSQL + PostGIS",
   "main": "src/app.ts",

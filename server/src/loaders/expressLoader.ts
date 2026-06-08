@@ -14,6 +14,21 @@ function expressLoader({ app, pool }: { app: Express; pool: Pool }): void {
 
   app.use('/api', routes(pool))
 
+  app.get('/', (_req, res) => {
+    res.json({
+      status: 'ok',
+      name: 'webgis-store',
+      version: '1.0.0',
+      endpoints: {
+        map: '/api/map',
+        kpi: '/api/kpi',
+        analytics: '/api/analytics',
+        products: '/api/products',
+        import: '/api/import'
+      }
+    })
+  })
+
   app.use(notFound)
   app.use(errorHandler)
 }
