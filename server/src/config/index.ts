@@ -23,7 +23,7 @@ interface GeojsonConfig {
 }
 
 interface CorsConfig {
-  origin: string
+  origin: string | string[]
 }
 
 interface AppConfig {
@@ -49,7 +49,9 @@ const config: AppConfig = {
     apiUrl: process.env.GEOJSON_API_URL
   },
   cors: {
-    origin: process.env.CORS_ORIGIN || 'http://localhost:3000'
+    origin: process.env.CORS_ORIGIN
+      ? process.env.CORS_ORIGIN.split(',').map(s => s.trim())
+      : 'http://localhost:3000'
   }
 }
 

@@ -1,5 +1,6 @@
 import { Request, Response } from 'express'
 import asyncHandler from '../utils/asyncHandler'
+import { sendSuccess } from '../utils/response'
 
 function mapHandler(mapSvc: {
   getGeoJSON: (filters: Record<string, string | undefined>) => Promise<Record<string, unknown>>
@@ -9,7 +10,7 @@ function mapHandler(mapSvc: {
     getGeoJSON: asyncHandler(async (req: Request, res: Response) => {
       const { category, segment, search } = req.query as Record<string, string | undefined>
       const geojson = await mapSvc.getGeoJSON({ category, segment, search })
-      res.json(geojson)
+      sendSuccess(res, geojson)
     }),
     getRadiusSearch: asyncHandler(async (req: Request, res: Response) => {
       const lng = parseFloat(req.query.lng as string)
@@ -20,7 +21,7 @@ function mapHandler(mapSvc: {
         return
       }
       const results = await mapSvc.getRadiusSearch(lng, lat, radius)
-      res.json(results)
+      sendSuccess(res, results)
     })
   }
 }

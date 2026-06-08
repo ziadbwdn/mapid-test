@@ -31,26 +31,10 @@ export function useGeoJSON(
     setLoading(true)
     setError(null)
 
-    const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api'
-    const searchParams = new URLSearchParams()
-    if (params) {
-      for (const [key, value] of Object.entries(params)) {
-        if (value !== undefined && value !== '' && value !== null) {
-          searchParams.set(key, String(value))
-        }
-      }
-    }
-    const qs = searchParams.toString()
-    const url = `${BASE_URL}${endpoint}${qs ? `?${qs}` : ''}`
-
-    fetch(url, { signal: controller.signal })
+    fetchApi<GeoJSONCollection>(endpoint, params, controller.signal)
       .then((res) => {
-        if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`)
-        return res.json()
-      })
-      .then((json) => {
         if (!controller.signal.aborted) {
-          setData(json)
+          setData(res.data)
           setLoading(false)
         }
       })
