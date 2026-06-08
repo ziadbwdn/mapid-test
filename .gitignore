@@ -6,9 +6,10 @@ Thumbs.db
 *node_modules/
 /vendor/
 
-# Ignore build outputs
+# Ignore build & coverage outputs
 *dist/
 /build/
+coverage/
 
 # Ignore environment files
 *.env

@@ -1,0 +1,55 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgis/postgis:14-3.4
+    container_name: mapid-db
+    restart: unless-stopped
+    env_file: ./server/.env
+    environment:
+      POSTGRES_DB: mapid
+      POSTGRES_USER: mapid
+      POSTGRES_PASSWORD: mapid_pass
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mapid -d mapid"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: mapid-server
+    restart: unless-stopped
+    env_file: ./server/.env
+    environment:
+      DATABASE_URL: postgres://mapid:mapid_pass@db:5432/mapid
+      PORT: 3001
+      NODE_ENV: production
+      CORS_ORIGIN: http://localhost:3000
+    ports:
+      - "3001:3001"
+    depends_on:
+      db:
+        condition: service_healthy
+    command: >
+      sh -c "node dist/migrate.js && node dist/app.js"
+
+  client:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+    container_name: mapid-client
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    depends_on:
+      - server
+
+volumes:
+  pgdata:
