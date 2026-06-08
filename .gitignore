@@ -24,4 +24,6 @@ coverage/
 
 # notebook artifacts
 notebook/*
-docs/*
+
+# architectural decision records (internal only)
+docs/adr/*
