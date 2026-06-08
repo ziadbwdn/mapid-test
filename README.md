@@ -78,9 +78,13 @@ curl -X POST http://localhost:3001/api/import
 
 ## Screenshots
 
-### Home / Map View
+### Home
 
-![Home / Map View](docs/assets/images/home-map.png)
+![Home](docs/assets/images/home-map.png)
+
+### Map View
+
+![Map View](docs/assets/images/map-view.png)
 
 ### Dashboard — KPI Overview
 
@@ -93,6 +97,10 @@ curl -X POST http://localhost:3001/api/import
 ### Dashboard — Health & Segment
 
 ![Dashboard Health](docs/assets/images/dashboard-health.png)
+
+### Dashboard — Map View
+
+![Dashboard Map View](docs/assets/images/dashboard-map-view.png)
 
 ## Dokumentasi Tambahan
 
