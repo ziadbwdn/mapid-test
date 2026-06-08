@@ -61,7 +61,7 @@ describe('API Integration', () => {
 
       const res = await (await import('supertest')).default(app).get('/api/map/geojson')
       expect(res.status).toBe(200)
-      expect(res.body).toEqual(geojson)
+      expect(res.body).toEqual({ success: true, data: geojson })
     })
 
     it('passes query filters', async () => {

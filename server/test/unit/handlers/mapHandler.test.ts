@@ -16,7 +16,7 @@ describe('mapHandler', () => {
 
     await (handler.getGeoJSON as any)(req, res)
     expect(mapSvc.getGeoJSON).toHaveBeenCalledWith({ category: undefined, segment: undefined, search: undefined })
-    expect(res.json).toHaveBeenCalledWith(mockGeoJSON)
+    expect(res.json).toHaveBeenCalledWith({ success: true, data: mockGeoJSON })
   })
 
   it('getGeoJSON passes query filters', async () => {
@@ -74,6 +74,6 @@ describe('mapHandler', () => {
 
     await (handler.getRadiusSearch as any)(req, res)
     expect(mapSvc.getRadiusSearch).toHaveBeenCalledWith(106.8, -6.2, 50000)
-    expect(res.json).toHaveBeenCalledWith([])
+    expect(res.json).toHaveBeenCalledWith({ success: true, data: [] })
   })
 })
